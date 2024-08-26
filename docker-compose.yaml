@@ -1,0 +1,54 @@
+services:
+  mongo:
+    image: mongo
+    restart: always
+    ports:
+      - 27017:27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: expense
+      MONGO_INITDB_DATABASE: expense
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/expense --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: node
+    command: >
+      sh -c "
+      rm -rf node_modules && rm -f package-lock.json &&
+      npm install && npm run start
+      "
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+    environment:
+      SESSION_SECRET: somethingtoken
+      MONGO_URI: mongodb://root:expense@mongo:27017/
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - 4000:4000
+
+  frontend:
+    image: node
+    command: |
+      sh -c "
+      rm -rf node_modules && rm -f package-lock.json &&
+      npm install && npm run dev -- --host
+      "
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    ports:
+      - 3000:3000
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
